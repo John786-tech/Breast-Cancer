@@ -1,0 +1,77 @@
+import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
+import seaborn as sns
+from sklearn.model_selection import train_test_split
+from sklearn.preprocessing import StandardScaler, LabelEncoder
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+import tensorflow as tf
+from tensorflow import keras
+
+df = pd.read_csv('data.csv')
+df = df.drop(columns=['id', 'Unnamed: 32'], errors='ignore')
+
+label_encoder = LabelEncoder()
+df['diagnosis'] = label_encoder.fit_transform(df['diagnosis'])
+
+print(f"Target Classes: {label_encoder.classes_} mapped to [0, 1]")
+
+X = df.drop(columns='diagnosis')
+y = df['diagnosis']
+
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+
+scaler = StandardScaler()
+X_train_std = scaler.fit_transform(X_train)
+X_test_std = scaler.transform(X_test)
+
+model = keras.Sequential([
+    keras.layers.Flatten(input_shape=(X_train_std.shape[1],)), 
+    keras.layers.Dense(20, activation='relu'),                 
+    keras.layers.Dense(20, activation='relu'),                 
+    keras.layers.Dense(1, activation='sigmoid')                
+])
+
+model.compile(optimizer='adam',
+              loss='binary_crossentropy',
+              metrics=['accuracy'])
+
+print("\nStarting Training...")
+history = model.fit(X_train_std, y_train, validation_split=0.1, epochs=20, verbose=1)
+
+loss, accuracy = model.evaluate(X_test_std, y_test)
+print(f"\nTest Accuracy: {accuracy:.4f}")
+
+y_pred_probs = model.predict(X_test_std)
+y_pred = (y_pred_probs > 0.5).astype("int32")
+
+plt.figure(figsize=(6, 5))
+cm = confusion_matrix(y_test, y_pred)
+sns.heatmap(cm, annot=True, fmt='d', cmap='Blues', cbar=False,
+            xticklabels=['Benign', 'Malignant'],
+            yticklabels=['Benign', 'Malignant'])
+plt.xlabel('Predicted Label')
+plt.ylabel('True Label')
+plt.title('Confusion Matrix')
+plt.show()
+
+plt.figure(figsize=(12, 5))
+
+plt.subplot(1, 2, 1)
+plt.plot(history.history['accuracy'], label='Train Accuracy')
+plt.plot(history.history['val_accuracy'], label='Validation Accuracy')
+plt.title('Model Accuracy')
+plt.xlabel('Epoch')
+plt.ylabel('Accuracy')
+plt.legend()
+
+plt.subplot(1, 2, 2)
+plt.plot(history.history['loss'], label='Train Loss')
+plt.plot(history.history['val_loss'], label='Validation Loss')
+plt.title('Model Loss')
+plt.xlabel('Epoch')
+plt.ylabel('Loss')
+plt.legend()
+plt.show()
+print("\nClassification Report:\n")
+print(classification_report(y_test, y_pred, target_names=['Benign', 'Malignant']))
